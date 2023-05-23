@@ -8,13 +8,16 @@ import json
 import requests
 from io import BytesIO
 
-# init data dict
+# init data dict temp, rain, snow, prec, cloud, wind, visi
 DATA = {
-    "hot": 0,
-    "warm": 0,
-    "cold": 0,
-    "snow": 0,
-    "rain": 0
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "U": 0,
+    "N": 0,
+    "W": 0,
+    "R": 0
 }
 
 # initialize serial communication with arduino
@@ -29,7 +32,7 @@ def get_weather_info():
     """
 
     # API URL
-    url = "https://api.open-meteo.com/v1/forecast?latitude=49.14&longitude=9.22&hourly=temperature_2m,rain,snowfall" 
+    url = "https://api.open-meteo.com/v1/forecast?latitude=49.14&longitude=9.22&hourly=temperature_2m,precipitation,rain,snowfall,cloudcover,visibility,windgusts_10m" 
     # Send GET request
     response = requests.get(url)
     # Check if the request was successful
@@ -54,16 +57,40 @@ def parse_info():
         data = json.load(f)
         data_dict = dict(data["hourly"])
         # temperature in C
-        temp = round(sum(data_dict["temperature_2m"]) / len(data_dict["temperature_2m"]), 2)
+        try:
+            temp = round(sum(data_dict["temperature_2m"]) / len(data_dict["temperature_2m"]), 2)
+        except:
+            temp = 0
         # rain in mm over ground
-        rain = round(sum(data_dict["rain"]) / len(data_dict["rain"]), 2)
+        try:
+            rain = round(sum(data_dict["rain"]) / len(data_dict["rain"]), 2)
+        except:
+            rain = 0
         # snowfall in cm over ground
-        snow = round(sum(data_dict["snowfall"]) / len(data_dict["snowfall"]), 2)
+        try: 
+            snow = round(sum(data_dict["snowfall"]) / len(data_dict["snowfall"]), 2)
+        except:
+            snow = 0
+        # ! FLAGS
+        # precipitation in mm
+        try:
+            prec =  round(sum(data_dict["precipitation"]) / len(data_dict["precipitation"]), 2)
+        except:
+            prec = 0
+        # cloudcover total in %
+        cloud = data_dict["cloudcover"]
+        # wind gusts in km/h
+        try:
+            wind = round(sum(data_dict["windgusts_10"]) / len(data_dict["windgusts_10"]), 2)
+        except:
+            wind = 0
+        # visibility in meters (max is 24)
+        visi = data_dict["visibility"]
 
-    return temp, rain, snow
+    return temp, rain, snow, prec, cloud, wind, visi
 
 
-def temperature(hot=25, warm=15, cold=5, snow=0.1, rain=0.1):
+def temperature(h=25, c=5, sn=0.1, r=0.1, pr=0.05, cl=40, w=10, v=15):
     """
     Flags temperature with 0 and 1, the options are:
     - Hot
@@ -74,41 +101,53 @@ def temperature(hot=25, warm=15, cold=5, snow=0.1, rain=0.1):
     Modifies global dictionary
     """
     # get info from function
-    temp, rain, snow = parse_info()
+    temp, rain, snow, prec, cloud, wind, visi = parse_info()
     # calculate desired temperature:
-    # for heat
-    if temp >= hot:
-        # TODO
-        DATA["hot"] = 1
-        DATA["warm"] = 0
-        DATA["cold"] = 0
-        DATA["snow"] = 0
-    # for warm
-    elif temp < 25 and temp > 10:
-        # TODO
-        DATA["warm"] = 1
-        DATA["hot"] = 0
-        DATA["cold"] = 0
-        DATA["snow"] = 0
-    # for cold 
-    elif temp < 10:
-        #TODO
-        DATA["cold"] = 1
-        DATA["warm"] = 0
-        DATA["hot"] = 0
     # for snow
-    if snow > 0.1:
+    if snow > sn:
         #TODO
-        DATA["warm"] = 0
-        DATA["hot"] = 0
-        DATA["snow"] = 1
-        DATA["cold"] = 1
-        DATA["rain"] = 0
+        DATA["1"] = 0
+        DATA["3"] = 1
+        DATA["2"] = 0
+        DATA["4"] = 0
     # for rain
-    if rain > 0.1:
+    elif rain > r:
         #TODO
-        DATA["snow"] = 0
-        DATA["rain"] = 1
+        DATA["1"] = 0
+        DATA["3"] = 0
+        DATA["2"] = 0
+        DATA["4"] = 1
+    # for heat
+    elif temp >= h:
+        # TODO
+        DATA["1"] = 1
+        DATA["3"] = 0
+        DATA["2"] = 0
+        DATA["4"] = 0
+    # for cold 
+    elif temp < c:
+        #TODO
+        DATA["1"] = 0
+        DATA["3"] = 0
+        DATA["2"] = 1
+        DATA["4"] = 0
+    # ! FLAGS
+    if prec > pr:
+        DATA["R"] = 1
+    else:
+        DATA["R"] = 0
+    if cloud > cl:
+        DATA["N"] = 1
+    else:
+        DATA["N"] = 0
+    if wind > w:
+        DATA["W"] = 1
+    else:
+        DATA["W"] = 0
+    if visi > v:
+        DATA["U"] = 1
+    else:
+        DATA["U"] = 0
 
 
 def send_info():
@@ -116,17 +155,17 @@ def send_info():
     Sends the arduino via serial communication a code
     designed to be parsed.
     The code is as follows:
-    H()C()W()S()R()
-    Where the () will be substitued either by a 0 or 1
+    NUMBER LETTER LETTER LETTER LETTER
+    Where LETTER will be substitued either by a 0 or a letter if 
+    the case.
     """
+    # init message
+    message = ""
     # code the message
-    h = DATA["hot"]
-    c = DATA["cold"]
-    w = DATA["warm"]
-    s = DATA["snow"]
-    r = DATA["rain"]
+    for key,value in DATA.items():
+        if value == 1:
+            message += key
 
-    message = f"H{h}C{c}W{w}S{s}R{r}"
     # write to arduino
     ser.write(str(message).encode("ascii"))
     # TODO time.sleep(10) 
