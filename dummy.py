@@ -8,6 +8,8 @@ import json
 import requests
 from io import BytesIO
 
+ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+
 # init data dict temp, rain, snow, prec, cloud, wind, visi
 DATA = {
     "1": 0,
@@ -19,7 +21,7 @@ DATA = {
     "W": 0,
     "R": 0
 }
-
+ANS = ""
 # initialize serial communication with arduino
 #ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
 #ser.reset_input_buffer()
@@ -32,10 +34,11 @@ def get_weather_info():
     """
 
     # API URL
-    url = "https://api.open-meteo.com/v1/forecast?latitude=49.14&longitude=9.22&hourly=temperature_2m,precipitation,rain,snowfall,cloudcover,visibility,windgusts_10m" 
+    url = "https://api.open-meteo.com/v1/forecast?latitude=45.14&longitude=9.22&hourly=temperature_2m,precipitation,rain,snowfall,cloudcover,visibility,windgusts_10m" 
     # Send GET request
     response = requests.get(url)
     # Check if the request was successful
+    print(response.status_code)
     if response.status_code == 200:
         # Parse JSON response
         data = response.json()
@@ -78,14 +81,20 @@ def parse_info():
         except:
             prec = 0
         # cloudcover total in %
-        cloud = data_dict["cloudcover"]
+        try:
+            cloud = round(sum( data_dict["cloudcover"]) / len(data_dict["cloudcover"]), 2)
+        except:
+            cloud = 0
         # wind gusts in km/h
         try:
             wind = round(sum(data_dict["windgusts_10"]) / len(data_dict["windgusts_10"]), 2)
         except:
             wind = 0
         # visibility in meters (max is 24)
-        visi = data_dict["visibility"]
+        try:
+            visi = round(sum(data_dict["visibility"]) / len(data_dict["visibility"]), 2)
+        except:
+            visi = 0
 
     return temp, rain, snow, prec, cloud, wind, visi
 
@@ -131,6 +140,8 @@ def temperature(h=25, c=5, sn=0.1, r=0.1, pr=0.05, cl=40, w=10, v=15):
         DATA["3"] = 0
         DATA["2"] = 1
         DATA["4"] = 0
+    else:
+        DATA["1"] = 1
     # ! FLAGS
     if prec > pr:
         DATA["R"] = 1
@@ -161,17 +172,25 @@ def send_info():
     """
     # init message
     message = ""
+    i = 0
+    print(DATA)
+    
     # code the message
     for key,value in DATA.items():
         if value == 1:
             message += key
-
+            i += 1
+    while i < 5:
+        message += "0"
+        i += 1
+    
+    print(message)
     # write to arduino
     ser.write(str(message).encode("ascii"))
     # TODO time.sleep(10) 
     # listen to answer
-    ans = ser.readline().decode('utf-8').rstrip()
     # output error
+    """
     if ans == 1:
         print("RGB FAILURE")
     elif ans == 2:
@@ -180,16 +199,17 @@ def send_info():
         print("SERVO FAILURE")
     elif ans == 4:
         print("BUZZER FAILURE")
-
+    """
 
 if __name__ == '__main__':
 
     while True:
-        # get api data
-        get_weather_info()
+        # get api data get_weather_info()
         # modify data dictionary 
         temperature()
         # send message
-        #send_info()
+        send_info()
         # sleep for 1 hour
-        time.sleep(3600)
+        ANS = ser.readline().decode('utf-8').rstrip() 
+        if ANS == "ADOLFO":
+            time.sleep(3600)
