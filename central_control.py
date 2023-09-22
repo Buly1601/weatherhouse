@@ -6,6 +6,7 @@ import pycurl
 import certifi
 import json
 import requests
+import serial
 from io import BytesIO
 
 ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
@@ -99,7 +100,7 @@ def parse_info():
     return temp, rain, snow, prec, cloud, wind, visi
 
 
-def temperature(h=25, c=5, sn=0.1, r=0.1, pr=0.05, cl=40, w=10, v=15):
+def temperature(h=20, c=5, sn=0.1, r=0.1, pr=0.05, cl=40, w=10, v=15):
     """
     Flags temperature with 0 and 1, the options are:
     - Hot
@@ -161,7 +162,7 @@ def temperature(h=25, c=5, sn=0.1, r=0.1, pr=0.05, cl=40, w=10, v=15):
         DATA["U"] = 0
 
 
-def send_info():
+def send_info(debug=False):
     """
     Sends the arduino via serial communication a code
     designed to be parsed.
@@ -173,7 +174,6 @@ def send_info():
     # init message
     message = ""
     i = 0
-    print(DATA)
     
     # code the message
     for key,value in DATA.items():
@@ -184,7 +184,10 @@ def send_info():
         message += "0"
         i += 1
     
-    print(message)
+    # debug helper
+    if debug:
+        print(message)
+
     # write to arduino
     ser.write(str(message).encode("ascii"))
     # TODO time.sleep(10) 
@@ -204,6 +207,7 @@ def send_info():
 if __name__ == '__main__':
 
     while True:
+        """
         # get api data get_weather_info()
         # modify data dictionary 
         temperature()
@@ -212,4 +216,6 @@ if __name__ == '__main__':
         # sleep for 1 hour
         ANS = ser.readline().decode('utf-8').rstrip() 
         if ANS == "ADOLFO":
-            time.sleep(3600)
+            time.sleep(3600)"""
+        send_info()
+        break
