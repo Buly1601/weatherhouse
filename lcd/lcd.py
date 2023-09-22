@@ -3,7 +3,7 @@ import board
 import busio
 import os
 import displayio
-from gauge import Gauge  # Make sure to download the Gauge library from: https://github.com/benevpi/Circuit-Python-Gauge
+from lcd.gauge import Gauge  # Make sure to download the Gauge library from: https://github.com/benevpi/Circuit-Python-Gauge
 import adafruit_ili9341
 
 displayio.release_displays()
